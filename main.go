@@ -57,19 +57,21 @@ func main() {
 
 	log.Printf("Got %d addresses from %s", len(addrs), *fname)
 
-	// Signature from local kmd?
+	// Get pub key from string
 	from, err := types.DecodeAddress(*sender)
 	if err != nil {
 		log.Fatalf("Invalid address: %s", *sender)
 	}
 	pk := ed25519.PublicKey(from[:])
 
+	// Get PW from user
 	fmt.Println("Please enter the wallet password:")
 	walletpw, err := terminal.ReadPassword(0)
 	if err != nil {
 		log.Fatalf("Failed to read password: %+v", err)
 	}
 
+	// Get suggested params from algod
 	suggestedParams, err := algodClient.SuggestedParams().Do(context.TODO())
 	if err != nil {
 		log.Fatalf("Failed to get suggested params: %+v", err)
@@ -93,8 +95,16 @@ func main() {
 		txnBuff.Write(signed.SignedTransaction)
 
 		if idx%16 == 0 {
-			algodClient.SendRawTransaction(txnBuff.Bytes())
+			_, err = algodClient.SendRawTransaction(txnBuff.Bytes()).Do(context.TODO())
+			if err != nil {
+				log.Fatalf("Failed to send raw Transaction: %+v", err)
+			}
+
 			txnBuff.Reset()
+			suggestedParams, err = algodClient.SuggestedParams().Do(context.TODO())
+			if err != nil {
+				log.Fatalf("Failed to get suggested params: %+v", err)
+			}
 		}
 	}
 }
