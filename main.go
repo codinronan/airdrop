@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/algorand/go-algorand-sdk/client/kmd"
 	"github.com/algorand/go-algorand-sdk/client/v2/algod"
@@ -32,7 +34,7 @@ var (
 	amt   = flag.Int("airdrop-asset-amt", 0, "Amount of asset to transfer")
 
 	sender = flag.String("airdrop-wallet-address", "", "Address to use as sender")
-	wallet = flag.String("airdrop-wallet-name", "", "Name of wallet to use")
+	wallet = flag.String("airdrop-wallet-id", "", "Id of wallet to use")
 
 	dryrun = flag.Bool("airdrop-dryrun", false, "Don't actually submit transactions")
 )
@@ -79,6 +81,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read password: %+v", err)
 	}
+	pass := strings.TrimSpace(string(walletpw))
+
+	handle, err := kmdClient.InitWalletHandle(*wallet, pass)
+	if err != nil {
+		log.Fatalf("Couldn't get a handle to the wallet: %+v", err)
+	}
 
 	// Read in file
 	addrs := getAddrs(*fname)
@@ -90,7 +98,10 @@ func main() {
 		log.Fatalf("Failed to get suggested params: %+v", err)
 	}
 
-	var txnBuff = bytes.NewBuffer(nil)
+	var (
+		wg      = &sync.WaitGroup{}
+		txnBuff = bytes.NewBuffer(nil)
+	)
 	for idx, addr := range addrs {
 		xfer, err := future.MakeAssetTransferTxn(*sender, addr, uint64(*amt), nil, suggestedParams, "", uint64(*asset))
 		if err != nil {
@@ -98,7 +109,7 @@ func main() {
 			continue
 		}
 
-		signed, err := kmdClient.SignTransactionWithSpecificPublicKey(*wallet, string(walletpw), xfer, pk)
+		signed, err := kmdClient.SignTransactionWithSpecificPublicKey(handle.WalletHandleToken, pass, xfer, pk)
 		if err != nil {
 			log.Printf("Failed to create signed transaction: %+v", err)
 			continue
@@ -112,7 +123,8 @@ func main() {
 			if *dryrun {
 				log.Printf("DRYRUN: send %d bytes, addr index %d", txnBuff.Len(), idx)
 			} else {
-				go sendTxn(algodClient, txnBuff.Bytes())
+				wg.Add(1)
+				go sendTxn(algodClient, txnBuff.Bytes(), wg)
 			}
 
 			txnBuff.Reset()
@@ -125,9 +137,13 @@ func main() {
 
 		}
 	}
+
+	wg.Wait()
 }
 
-func sendTxn(algodClient *algod.Client, rawb []byte) {
+func sendTxn(algodClient *algod.Client, rawb []byte, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	txid, err := algodClient.SendRawTransaction(rawb).Do(context.TODO())
 	if err != nil {
 		log.Printf("Failed to send raw Transaction: %+v", err)
@@ -152,6 +168,7 @@ func sendTxn(algodClient *algod.Client, rawb []byte) {
 			break
 		}
 	}
+
 }
 
 func getAddrs(fname string) []string {
