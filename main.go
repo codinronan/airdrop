@@ -23,20 +23,34 @@ var (
 	algodToken = flag.String("airdrop-algod-token", "", "token to use when making requests to Algorand node")
 
 	kmdHost  = flag.String("airdrop-kmd-host", "127.0.0.1", "hostname of Key Management Daemon")
-	kmdPort  = flag.Int("airdrop-kmd-port", 4001, "port of Key Management Daemon")
+	kmdPort  = flag.Int("airdrop-kmd-port", 7833, "port of Key Management Daemon")
 	kmdToken = flag.String("airdrop-kmd-token", "", "token to use when making requests to Key Management Daemon")
 
+	fname = flag.String("airdrop-address-file", "address.csv", "Path to file containing list of addresses to airdrop to")
+
 	asset = flag.Int("airdrop-asset-id", 0, "Asset id to transfer")
-	amt   = flag.Int("airdrop-asset-amt", 0, "Asset id to transfer")
-	fname = flag.String("airdrop-asset-file", "address.csv", "Path to file containing list of addresses to airdrop to")
+	amt   = flag.Int("airdrop-asset-amt", 0, "Amount of asset to transfer")
 
-	sender = flag.String("airdrop-from", "", "Address to use as sender")
+	sender = flag.String("airdrop-wallet-address", "", "Address to use as sender")
+	wallet = flag.String("airdrop-wallet-name", "", "Name of wallet to use")
 
-	wallet = flag.String("airdrop-wallet", "", "Name of wallet to use")
+	dryrun = flag.Bool("airdrop-dryrun", false, "Don't actually submit transactions")
 )
 
 func main() {
 	flag.Parse()
+
+	if *sender == "" || *wallet == "" {
+		fmt.Println("Must include sender and wallet name")
+		flag.PrintDefaults()
+		return
+	}
+
+	if *amt == 0 || *asset == 0 {
+		fmt.Println("No asset id or amount specified")
+		flag.PrintDefaults()
+		return
+	}
 
 	// Create a kmd client
 	kmdAddress := fmt.Sprintf("http://%s:%d", *kmdHost, *kmdPort)
@@ -49,13 +63,8 @@ func main() {
 	algodAddress := fmt.Sprintf("http://%s:%d", *algodHost, *algodPort)
 	algodClient, err := algod.MakeClient(algodAddress, *algodToken)
 	if err != nil {
-		log.Fatalf("Failed to make client: %+v", err)
+		log.Fatalf("Failed to make algod client: %+v", err)
 	}
-
-	// Read in file
-	addrs := getAddrs(*fname)
-
-	log.Printf("Got %d addresses from %s", len(addrs), *fname)
 
 	// Get pub key from string
 	from, err := types.DecodeAddress(*sender)
@@ -71,6 +80,10 @@ func main() {
 		log.Fatalf("Failed to read password: %+v", err)
 	}
 
+	// Read in file
+	addrs := getAddrs(*fname)
+	log.Printf("Got %d addresses from %s", len(addrs), *fname)
+
 	// Get suggested params from algod
 	suggestedParams, err := algodClient.SuggestedParams().Do(context.TODO())
 	if err != nil {
@@ -78,7 +91,6 @@ func main() {
 	}
 
 	var txnBuff = bytes.NewBuffer(nil)
-
 	for idx, addr := range addrs {
 		xfer, err := future.MakeAssetTransferTxn(*sender, addr, uint64(*amt), nil, suggestedParams, "", uint64(*asset))
 		if err != nil {
@@ -94,17 +106,50 @@ func main() {
 
 		txnBuff.Write(signed.SignedTransaction)
 
+		// For every 16 (current max grouped txns), try to send
 		if idx%16 == 0 {
-			_, err = algodClient.SendRawTransaction(txnBuff.Bytes()).Do(context.TODO())
-			if err != nil {
-				log.Fatalf("Failed to send raw Transaction: %+v", err)
+
+			if *dryrun {
+				log.Printf("DRYRUN: send %d bytes, addr index %d", txnBuff.Len(), idx)
+			} else {
+				go sendTxn(algodClient, txnBuff.Bytes())
 			}
 
 			txnBuff.Reset()
+
+			//Refresh suggested params since they may have changed singe we last requested them
 			suggestedParams, err = algodClient.SuggestedParams().Do(context.TODO())
 			if err != nil {
 				log.Fatalf("Failed to get suggested params: %+v", err)
 			}
+
+		}
+	}
+}
+
+func sendTxn(algodClient *algod.Client, rawb []byte) {
+	txid, err := algodClient.SendRawTransaction(rawb).Do(context.TODO())
+	if err != nil {
+		log.Printf("Failed to send raw Transaction: %+v", err)
+	}
+
+	log.Printf("Sent %d bytes with txid %s", len(rawb), txid)
+
+	for {
+		resp, _, err := algodClient.PendingTransactionInformation(txid).Do(context.TODO())
+		if err != nil {
+			log.Printf("Failed to get pending txn info for %s: %+v", txid, err)
+			break
+		}
+
+		if resp.ConfirmedRound != 0 {
+			log.Printf("Txn %s success", txid)
+			break
+		}
+
+		if len(resp.PoolError) > 0 {
+			log.Printf("Pool Error: %s", resp.PoolError)
+			break
 		}
 	}
 }
@@ -120,6 +165,7 @@ func getAddrs(fname string) []string {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
+		// Check that its a valid address
 		_, err := types.DecodeAddress(scanner.Text())
 		if err != nil {
 			log.Printf("Failed to decode address: %s", err)

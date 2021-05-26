@@ -14,8 +14,5 @@ Run it with something like this:
 
 TODO:
 
- - Add a Dryrun option
- - Thread out txns for faster processing
- - Actually check to see if the txn went thru 
  - Query the accts prior to sending to make sure we're not double sending in the case of a fail/restart
 
