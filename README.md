@@ -31,8 +31,9 @@ Usage of ./airdrop:
         token to use when making requests to Key Management Daemon
   -airdrop-wallet-address string
         Address to use as sender
-  -airdrop-wallet-name string
-        Name of wallet to use
+  -airdrop-wallet-id string
+        Id of wallet to use
+
 ```
 
 
