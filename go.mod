@@ -1,4 +1,4 @@
-module github.com/barnjamin/Airdrop
+module github.com/barnjamin/airdrop
 
 go 1.15
 
