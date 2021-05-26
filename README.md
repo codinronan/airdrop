@@ -55,7 +55,8 @@ Run a dryrun to check file and parameters
         -airdrop-kmd-token aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
         -airdrop-wallet-address 7LQ7U4SEYEVQ7P4KJVCHPJA5NSIFJTGIEXJ4V6MFS4SL5FMDW6MYHL2JXM  \
         -airdrop-wallet-id "446f2cb0af0e478ce48af3c6c4c95693" \
-        -airdrop-address-file addrs.csv
+        -airdrop-address-file addrs.csv \
+        -airdrop-dryrun
 ```
 
 Then just lop off -airdrop-dryrun and it should just work ™
