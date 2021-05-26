@@ -1,4 +1,4 @@
-# Airdrop
+# Ⱥirdrop
 Airdrop an asset on algorand
 
 Takes a list of addresses, one address per row and tries to submit an asset xfer on algorand for each one.
