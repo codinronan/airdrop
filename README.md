@@ -48,11 +48,14 @@ go build
 
 Run a dryrun to check file and parameters
 ```
-./airdrop -airdrop-asset-id 10  \
-        -airdrop-asset-amt 100 \
-        -airdrop-wallet-address GBDUTCSTHDO3RFUACXJ2QOM6ABHGXEC246VSDB6RARB2EO5JBVL7HD273Q \
-        -airdrop-wallet-name wbx \ 
-	-airdrop-dryrun 
+./airdrop -airdrop-asset-id 5  \
+        -airdrop-asset-amt 10 \
+        -airdrop-kmd-port 4002 \
+        -airdrop-algod-token aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+        -airdrop-kmd-token aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+        -airdrop-wallet-address 7LQ7U4SEYEVQ7P4KJVCHPJA5NSIFJTGIEXJ4V6MFS4SL5FMDW6MYHL2JXM  \
+        -airdrop-wallet-id "446f2cb0af0e478ce48af3c6c4c95693" \
+        -airdrop-address-file addrs.csv
 ```
 
 Then just lop off -airdrop-dryrun and it should just work ™
