@@ -58,9 +58,8 @@ Run a dryrun to check file and parameters
 Then just lop off -airdrop-dryrun and it should just work ™
 
 
+Tested this in my local sandbox and it works but YMMV
 
 TODO:
- 
- - Actually test it
  - Query the accts prior to sending to make sure we're not double sending in the case of a fail/restart
 
